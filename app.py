@@ -37,18 +37,36 @@ def phoneThread(s,q):
         s.close()
    
 
-def phoneServer(port,q):
+def Server(port,qrecv, qsend):
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     #with closing( socket.socket(socket.AF_INET, socket.SOCK_STREAM) ) as s:
         s.bind(('', port))
         s.listen()
-        print('listening on: ', port)
+        print('phone server listening on: ', port)
+        ts = []
+       # client_sock = None
         while True:
             conn, addr = s.accept()
             print('port: ' ,port,'Connected by', addr)
-            t = Thread(target= phoneThread, args=(conn,q))
-            t.start()
+            
+            if ts:
+                for t in ts:
+                    t.stop()
+                ts.clear()
+            '''
+            if client_sock:
+                client_sock.close()
+                '''
+            tsend =SendThread(conn,qsend)
+            ts.append(tsend)
+            ts.append(RecvThread(conn,qrecv,tsend))
+            #client_sock = conn
+            
+            for t in ts:
+                t.start()
+
+
     except KeyboardInterrupt:
         return
     finally:
@@ -68,11 +86,12 @@ def boardThread(s,q):
     finally:
         s.close()
 
-class BoardThread(StoppableThread):
+class SendThread(StoppableThread):
     def __init__(self,socket, q):
         super().__init__()
         self._s = socket
         self._q = q
+        self.name = 'Send thread '
     
     def run(self):
         
@@ -86,60 +105,64 @@ class BoardThread(StoppableThread):
            
             try:
                 self._s.send(data)
-            except ConnectionAbortedError:
-                print('board socket closed')
+            except:
+                print('peer socket closed')
                 break
 
             print('send: ', data)
 
-        print('close socket and quit thread')
+        print('quit send thread')
         self._s.close()
                 
+class RecvThread(StoppableThread):
+    def __init__(self,socket, q,tx_thread):
+        super().__init__()
+        self._s = socket
+        self._q = q
+        self._tx = tx_thread
+        self.name = 'Recv thread '
         
-        
-
-
-def boardServer(port,q):
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-   # with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM) ) as s:
-        s.bind(('', port))
-        s.listen(1)
-        print('listening on: ', port)
-        t = None
+    
+    def run(self):
         while True:
-            conn, addr = s.accept()
-            print('port: ', port,'Connected by', addr)
-            # 只允许一个板卡连接
-            if t:
-                print('close old connection: ')
-                t.stop()
-            
-            t = BoardThread(conn,q)
-            t.start()        
-                    
-    except KeyboardInterrupt:
-        return
-    finally:
-        s.close()
+            if self.stopped():
+                break
+
+            try:
+                data = self._s.recv(1024)
+            except :
+                print('peer socket closed')
+                break
+
+            print('recv: {}'.format(data))
+
+            if not data:    #socket关闭后退出线程
+                print('peer socket closed')
+                break   
+            self._q.put(data)
+
+        print('quit  recv thread')
+        self._tx.stop()
+        self._s.close()
+        
+
+
+
 
 
 
 
 
 if __name__ == '__main__':
-    q = Queue()
-    p1 = Thread(target=boardServer , args = (3000,q))
-    p2 = Thread(target=phoneServer , args = (5000,q))
+    qin,qout = Queue(),Queue()  #qin是从手机到处理板的队列
+    pBoard = Thread(target=Server , args = (3000, qin, qout))
+    pPhone = Thread(target=Server , args = (5000, qout, qin ))
 
-    p1.start()
-    
-    p2.start()
+    pBoard.start()
+    pPhone.start()
 
-
-    p1.join()
-    p2.join()
+    pBoard.join()
+    pPhone.join()
 
 
 
