@@ -58,6 +58,14 @@ def Server(port,qrecv, qsend):
             if client_sock:
                 client_sock.close()
                 '''
+            while qrecv.empty() == False:
+                print('clear qrecv')
+                qrecv.get(timeout = 0.1)
+            
+            while qsend.empty() == False:
+                print('clear qsend')
+                qsend.get(timeout = 0.1)
+                
             tsend =SendThread(conn,qsend)
             ts.append(tsend)
             ts.append(RecvThread(conn,qrecv,tsend))
@@ -163,9 +171,7 @@ if __name__ == '__main__':
 
     pBoard.join()
     pPhone.join()
-
-
-
+    #print('test end')
     
 
 
