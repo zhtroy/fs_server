@@ -6,6 +6,7 @@ from contextlib import closing
 import socketserver
 from datetime import datetime
 import queue
+import time
 
 
 class StoppableThread(threading.Thread):
@@ -66,6 +67,9 @@ def Server(port,qrecv, qsend):
                 print('clear qsend')
                 qsend.get(timeout = 0.1)
                 
+			if(port == 3000)
+				ts.append(HeartThread(qsend))
+				
             tsend =SendThread(conn,qsend)
             ts.append(tsend)
             ts.append(RecvThread(conn,qrecv,tsend))
@@ -121,6 +125,22 @@ class SendThread(StoppableThread):
 
         print('quit send thread')
         self._s.close()
+
+class HeartThread(StoppableThread):
+	def __init__(self,qs):
+        super().__init__()
+        self._q = qs
+        self.name = 'Heart thread ' 
+	
+	def run(self)
+		while True:
+			time.sleep(1)
+			if self.stopped():
+				break
+			self._q.put('$h^')
+			print('heart Send')
+			
+		print('quit heart thread')
                 
 class RecvThread(StoppableThread):
     def __init__(self,socket, q,tx_thread):
