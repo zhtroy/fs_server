@@ -68,11 +68,15 @@ def Server(port,qrecv, qsend):
                 qsend.get(timeout = 0.1)
                 
             if port == 3000:
-                ts.append(HeartThread(qsend))
+                theart = HeartThread(qsend)
+                ts.append(theart)
+            else:
+                theart = None
+
 
             tsend =SendThread(conn,qsend)
             ts.append(tsend)
-            ts.append(RecvThread(conn,qrecv,tsend))
+            ts.append(RecvThread(conn,qrecv,tsend,theart))
             #client_sock = conn
             
             for t in ts:
@@ -143,11 +147,12 @@ class HeartThread(StoppableThread):
         print('quit heart thread')
                 
 class RecvThread(StoppableThread):
-    def __init__(self,socket, q,tx_thread):
+    def __init__(self,socket, q,tx_thread,ht_thread):
         super().__init__()
         self._s = socket
         self._q = q
         self._tx = tx_thread
+        self._heart = ht_thread
         self.name = 'Recv thread '
         
     
@@ -171,6 +176,8 @@ class RecvThread(StoppableThread):
 
         print('quit  recv thread')
         self._tx.stop()
+        if self._heart:
+            self._heart.stop()
         self._s.close()
         
 
